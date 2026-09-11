@@ -12,6 +12,8 @@ const constraints = {
 };
 
 const LaunchFeed = async () => {
+    // This is a simple one-to-one svelte adaptation of the MediaDevices API:
+    // https://developer.mozilla.org/es/docs/Web/API/MediaDevices
 
     navigator.mediaDevices
     .getUserMedia(constraints)
@@ -60,48 +62,49 @@ onMount(() => {
 });
 
 </script>
+<div class="video-feed-controls">
+    <button id ="start" onclick={LaunchFeed}>
+        Start VideoFeed
+    </button>
+    <button id ="stop" onclick={() => {console.log("Stopping video");  stopStream(); }}>
+        STOP Video
+    </button>
 
-<button id ="start" onclick={LaunchFeed}>
-    Start VideoFeed
-</button>
-
-<button id ="play" onclick={() => {
-    if (videoFeed){
-        console.log("Playing video");
-        videoFeed.play();
-    } else {
-        console.log("No video feed available. reLaunching feed...");
-        LaunchFeed();
+    <!-- <button id ="play" onclick={() => {
+        if (videoFeed){
+            console.log("Playing video");
+            videoFeed.play();
+        } else {
+            console.log("No video feed available. reLaunching feed...");
+            LaunchFeed();
+        }
     }
-}
 
-}>
-    Play Video
-</button>
+    }>
+        Play Video
+    </button> -->
 
-<button id ="stop" onclick={() => {console.log("Stopping video");  stopStream(); }}>
-    STOP Video
-</button>
+</div>
 
 <p class="tip">
     Input Camera Feed
 </p>
 
 <section class="preview">
-{#if !videoFeed && !loading}
-    <div id="emptyState" class="empty">No camera selected</div>
-{/if}
+    {#if !videoFeed && !loading}
+        <div id="emptyState" class="empty">No camera selected</div>
+    {/if}
 
-{#if loading}
-    <div>Loading camera feed...</div>
-{/if}
+    {#if loading}
+        <div>Loading camera feed...</div>
+    {/if}
 
-<video bind:this={videoFeed}
-        autoplay
-        muted 
-        playsinline
-        >
-</video>
+    <video bind:this={videoFeed}
+            autoplay
+            muted 
+            playsinline
+            >
+    </video>
 
 </section>
 
@@ -122,5 +125,13 @@ onMount(() => {
         height: 100%; 
         object-fit: contain; 
         display: block; 
+    }
+
+    .video-feed-controls {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        margin-bottom: 16px;
+        margin-top: 16px;
     }
 </style>
