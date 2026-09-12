@@ -21,6 +21,13 @@
   --ev-button-alt-hover-border: transparent;
   --ev-button-alt-hover-text: var(--ev-c-text-1);
   --ev-button-alt-hover-bg: var(--ev-c-gray-2);
+
+  --ev-button-alt-text-primary: var(--ev-c-black);
+  --ev-button-alt-bg-primary: var(--ev-c-white-mute);
+
+  --ev-button-alt-hover-text-primary: var(--ev-c-gray-1);
+  --ev-button-alt-hover-bg-primary: var(--ev-c-white);
+
 }
 
 :root {

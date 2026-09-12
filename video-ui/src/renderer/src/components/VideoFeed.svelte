@@ -1,19 +1,73 @@
-<script>
+<script lang="ts">
 import {onMount} from "svelte";
 
-let videoFeed = $state(null);
-let loading = $state(true);
+let videoHTML: HTMLVideoElement | null = $state(null);
+let loading = $state(false); 
+
+let devices: MediaDeviceInfo[] = $state([]);
+let selectedDeviceId: string | null = $state(null);
+
+let foo = ["foo", "bar"];
+function timestamp() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+}
+
+// function selectedResolution() {
+//   const [width, height] = resolutionSelect.value.split("x").map(Number);
+//   return { width, height };
+// }
+
+
+
 
 //const video = document.querySelector("video");
+const width = 1280;
+const height = 720;
 
-const constraints = {
+let constraints = $state({
   audio: false,
-  video: true,
-};
+  //video: true,
+  video: {
+    // deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+    width: { exact: width },
+    height: { exact: height},
+  }
+//   video: {
+//         deviceId: deviceId ? { exact: deviceId } : undefined,
+//         width: { ideal: width },
+//         height: { ideal: height },
+//         frameRate: { ideal: 30 }
+//       }
+});
 
-const LaunchFeed = async () => {
+function setSelectedDeviceId() {
+    //selectedDeviceId = deviceId;
+    constraints.video.deviceId = selectedDeviceId ? { exact: selectedDeviceId } : undefined;
+}
+
+function handleDeviceChange() {
+    stopVideoStream();
+    setSelectedDeviceId();
+    console.log("selected video stream with constraints:", constraints);
+
+}
+
+const startVideoStream = async () => {
     // This is a simple one-to-one svelte adaptation of the MediaDevices API:
     // https://developer.mozilla.org/es/docs/Web/API/MediaDevices
+    
+    
+    //stopVideoStream();
+
+    if(!selectedDeviceId)
+        return;
+
+    loading = true;
+    console.log("Starting video stream with constraints:", constraints);
+
+    //setSelectedDeviceId();
 
     navigator.mediaDevices
     .getUserMedia(constraints)
@@ -24,12 +78,23 @@ const LaunchFeed = async () => {
         console.log("Tengo transmisión con las restricciones:", constraints);
         console.log(`Usando el dispositivo de vídeo: ${videoTracks[0].label}`);
 
-        stream.onremovetrack = () => {
-        console.log("Transmisión finalizada");
-        };
+        if (!videoHTML) {
+            console.error("No video feed element available.");
+            return;
+        }
+        videoHTML.srcObject = stream;
+        // videoFeed.play();
 
-        videoFeed.srcObject = stream;
-        videoFeed.play();
+        // Stop the stream when the track ends
+        stream.getVideoTracks().forEach(track => track.onended = () => {
+            stopVideoStream();
+            console.log("Transmisión finalizada");
+        });
+        
+        // stream.onremovetrack = () => {
+        //     console.log("Transmisión finalizada");
+        // };
+
         loading = false;
     
     })
@@ -49,57 +114,93 @@ const LaunchFeed = async () => {
 
 }
 
-
-async function stopStream() {
-  if (videoFeed && videoFeed.srcObject) {
-    videoFeed.srcObject.getTracks().forEach(track => track.stop());
-    videoFeed.srcObject = null;
-  }
+function stopVideoStream() {
+    const source = videoHTML?.srcObject;
+    if (source instanceof MediaStream) {
+        source.getTracks().forEach(track => track.stop());
+    }
+    if (videoHTML) {videoHTML.srcObject = null;}
 }
 
-onMount(() => {
-    //LaunchFeed();
+
+const loadVideoDevices = async () => {
+  
+    navigator.mediaDevices
+    .enumerateDevices()
+    .then((devicesList) => {
+        console.log("All video devices:", devicesList);
+        devices = devicesList.filter(device => device.kind === "videoinput");
+        console.log("Filtered video devices:", devices);
+    })
+    .catch((error) => {
+        console.error(`Error loading video devices: ${error.name}`, error);
+    });
+
+}
+
+onMount(async () => {
+    // First getUserMedia call obtains permission and makes labels available.
+    await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+    await loadVideoDevices();
 });
 
+
+// [ ] TODO: add a reactive blinking icon to indicate recording status
+let wink = $state(false)
+
+function RecON() {
+    console.log("Starting recording...");
+    wink = true;
+}
+
+function RecSTOP() {
+    console.log("Stopping recording...");
+    wink = false;
+}
+
+// exported functions for controlling recording in App.svelte
+export { RecON, RecSTOP };
+
+
+
 </script>
-<div class="video-feed-controls">
-    <button id ="start" onclick={LaunchFeed}>
-        Start VideoFeed
+
+
+
+<select class="device-select" bind:value={selectedDeviceId} onchange={handleDeviceChange}>
+    <option value={null}>Please select a camera...</option>
+
+	{#each devices as device}
+		<option value={device.deviceId}> {device.label} | {device.deviceId.slice(0, 6)}...</option>
+	{/each}
+</select>
+
+<div class="action video-controls">
+
+    <button id ="start" class="primary" onclick={startVideoStream}> Camera ON</button>
+
+    <button id ="stop" 
+        onclick={() => {
+            console.log("Stopping video");  stopVideoStream(); 
+        }}>
+         OFF
     </button>
-    <button id ="stop" onclick={() => {console.log("Stopping video");  stopStream(); }}>
-        STOP Video
-    </button>
-
-    <!-- <button id ="play" onclick={() => {
-        if (videoFeed){
-            console.log("Playing video");
-            videoFeed.play();
-        } else {
-            console.log("No video feed available. reLaunching feed...");
-            LaunchFeed();
-        }
-    }
-
-    }>
-        Play Video
-    </button> -->
-
 </div>
 
-<p class="tip">
-    Input Camera Feed
-</p>
-
 <section class="preview">
-    {#if !videoFeed && !loading}
+    {#if !selectedDeviceId && !loading}
         <div id="emptyState" class="empty">No camera selected</div>
     {/if}
 
     {#if loading}
-        <div>Loading camera feed...</div>
+        <div>Loading camera...</div>
     {/if}
 
-    <video bind:this={videoFeed}
+    {#if wink}
+        <div class="recording-indicator">●</div>
+    {/if}
+    <video bind:this={videoHTML}
             autoplay
             muted 
             playsinline
@@ -109,7 +210,6 @@ onMount(() => {
 </section>
 
 <style>
-
     .preview { 
         position: relative; 
         width: 50%; 
@@ -127,11 +227,39 @@ onMount(() => {
         display: block; 
     }
 
-    .video-feed-controls {
+    .video-controls {
         display: flex;
         flex-direction: row;
         gap: 8px;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
+        margin-top: 8px;
+    }
+
+    .device-select {
+        margin-bottom: 0px;
         margin-top: 16px;
+        width: 60%;
+        box-sizing: border-box;
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px solid #292e37;
+        background: #070809;
+        color: #ffffff;
+    }
+
+    .recording-indicator {
+        position: absolute;
+        top: 0px;
+        right: 8px;
+        color: red;
+        padding: 2px 2px ;
+        border-radius: 4px;
+        font-weight: bold;
+        animation: blink 1.2s infinite;
+    }
+
+    @keyframes blink {
+        0%, 50%, 100% { opacity: 0.8; }
+        25%, 75% { opacity: 0.2; }
     }
 </style>

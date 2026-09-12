@@ -5,29 +5,30 @@
   import electronLogo from './assets/electron.svg'
 
   const ipcHandle = () => window.electron.ipcRenderer.send('ping')
+
+
+ let rec = $state(null)
+
 </script>
 
-<img alt="logo" class="logo" src={electronLogo} />
-<div class="creator">Powered by electron-vite</div>
+
 <div class="text">
-  Build an Electron app with
-  <span class="svelte">Svelte</span>
+  Live Camera
+ 
+    <button class="action svelte" onclick={() => rec?.RecON()}>
+      REC ON
+    </button>
+    <button class="action primary" onclick={() => rec?.RecSTOP()}>
+      ■ STOP recording
+    </button>
+
 </div>
-<p class="tip">Please try pressing <code>F12</code> to open the devTool</p>
-<div class="actions">
-  <div class="action">
-    <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">Documentation</a>
-  </div>
-  <div class="action">
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions a11y-missing-attribute-->
-    <a target="_blank" rel="noreferrer" on:click={ipcHandle}>Send IPC</a>
-  </div>
-</div>
-<Versions />
-
-<VideoFeed/>
+<p class="tip">Create a <code>new project</code>, add cameras and click <code>REC</code> to start recording</p>
 
 
-<div class="video-player">  
+<VideoFeed bind:this={rec}/>
+
+
+<!-- <div class="video-player">  
   <VideoPlayer/>
-</div>
+</div> -->
