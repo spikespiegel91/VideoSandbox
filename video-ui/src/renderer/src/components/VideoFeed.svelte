@@ -168,24 +168,16 @@ export { RecON, RecSTOP };
 
 
 
-<select class="device-select" bind:value={selectedDeviceId} onchange={handleDeviceChange}>
-    <option value={null}>Please select a camera...</option>
 
-	{#each devices as device}
-		<option value={device.deviceId}> {device.label} | {device.deviceId.slice(0, 6)}...</option>
-	{/each}
-</select>
+<div class="video-controls">
 
-<div class="action video-controls">
+    <select class="device-select" bind:value={selectedDeviceId} onchange={handleDeviceChange}>
+        <option value={null}>Please select a camera...</option>
+        {#each devices as device}
+            <option value={device.deviceId}> {device.label} | {device.deviceId.slice(0, 6)}...</option>
+        {/each}
+    </select>
 
-    <button id ="start" class="primary" onclick={startVideoStream}> Camera ON</button>
-
-    <button id ="stop" 
-        onclick={() => {
-            console.log("Stopping video");  stopVideoStream(); 
-        }}>
-         OFF
-    </button>
 </div>
 
 <section class="preview">
@@ -209,16 +201,29 @@ export { RecON, RecSTOP };
 
 </section>
 
+<div class="action right tooltip">
+    <button id ="start" class="primary" onclick={startVideoStream}> Camera ON</button>
+    <button id ="stop" 
+        onclick={() => {
+            console.log("Stopping video");  stopVideoStream(); 
+        }}>
+        OFF
+    </button>
+</div>
+
+    
+
 <style>
     .preview { 
         position: relative; 
-        width: 50%; 
+        width: 100%; 
         aspect-ratio: 16 / 9; 
         background: #070809; 
         border-radius: 10px; 
         overflow: hidden; 
         border: 1px solid #292e37; 
-        margin: 16px 0 ;
+        margin: 0px;
+       
     }
     video {
         width: 100%; 
@@ -230,21 +235,36 @@ export { RecON, RecSTOP };
     .video-controls {
         display: flex;
         flex-direction: row;
-        gap: 8px;
-        margin-bottom: 8px;
-        margin-top: 8px;
+        gap: 1rem;
+        margin-top: 5px;
+        margin-bottom: 5px;
+        align-items: center;
+        justify-content: start;
+        height: 30px;
+    }
+
+    .tooltip {
+        position: absolute;
+        right: 0px;
+       
+        color: white;
+        padding: 5px;
+        margin-right: 10px;
+        transform: translate(0%, -120%);
     }
 
     .device-select {
-        margin-bottom: 0px;
-        margin-top: 16px;
-        width: 60%;
+        width: 50%;
         box-sizing: border-box;
         padding: 8px;
         border-radius: 12px;
         border: 1px solid #292e37;
         background: #070809;
         color: #ffffff;
+    }
+
+    .right { 
+        margin-left: auto;
     }
 
     .recording-indicator {
