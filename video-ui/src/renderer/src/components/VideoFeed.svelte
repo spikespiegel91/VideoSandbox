@@ -8,6 +8,7 @@ let devices: MediaDeviceInfo[] = $state([]);
 let selectedDeviceId: string | null = $state(null);
 
 let foo = ["foo", "bar"];
+
 function timestamp() {
   const d = new Date();
   const p = n => String(n).padStart(2, "0");
@@ -18,9 +19,6 @@ function timestamp() {
 //   const [width, height] = resolutionSelect.value.split("x").map(Number);
 //   return { width, height };
 // }
-
-
-
 
 //const video = document.querySelector("video");
 const width = 1280;
@@ -138,12 +136,80 @@ const loadVideoDevices = async () => {
 
 }
 
+
+//  save utils
+//  const ipcHandle = () => window.electron.ipcRenderer.send('ping')
+
+
+
+
+//
+
 onMount(async () => {
     // First getUserMedia call obtains permission and makes labels available.
     await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
 
     await loadVideoDevices();
 });
+
+// [ ] add a select input for choosing the save directory
+
+function selectSaveDirectory() {
+    window.api.chooseDirectory().then((directory) => {
+        if (directory) {
+            SaveDirectory = directory;
+        }
+    });
+}
+
+
+let SaveDirectory = $state('');
+let recorder = $state(null);
+let chunks = $state([]);
+let mimeType = $state('video/webm');
+
+async function saveVideoStream( saveDirectory: string ) {
+    const blob = new Blob(chunks, { type: mimeType });
+    const buffer = new Uint8Array(await blob.arrayBuffer());
+    const filename = `recording-${timestamp()}.webm`;
+
+    try {
+        
+        await window.api.saveFile({ 
+            directory: saveDirectory, 
+            filename, 
+            data: buffer 
+        })
+
+        console.log(`Video saved successfully to ${saveDirectory}/${filename}`);
+
+    } catch (error) {
+        console.error(`Error saving video stream: ${error.name}`, error);
+    }
+}
+
+function setNewRecorder() {
+
+    if (!videoHTML?.srcObject) {
+        throw new Error("No video stream available");
+    }
+
+    recorder = new MediaRecorder(videoHTML.srcObject , { mimeType });
+
+    recorder.ondataavailable = e => {
+        if (e.data.size) chunks.push(e.data);
+    };
+
+    recorder.onstop = async () => {
+        await saveVideoStream(SaveDirectory);
+        chunks = [];
+        recorder = null;
+    };
+
+    return recorder;
+}
+
+
 
 
 // [ ] TODO: add a reactive blinking icon to indicate recording status
@@ -152,11 +218,22 @@ let wink = $state(false)
 function RecON() {
     console.log("Starting recording...");
     wink = true;
+
+    // we need ot record and save the video stream
+    chunks = [];
+    setNewRecorder();
+    recorder.start(1000);
+
+
 }
 
 function RecSTOP() {
     console.log("Stopping recording...");
     wink = false;
+
+    if (recorder) {
+        recorder.stop();
+    }
 }
 
 // exported functions for controlling recording in App.svelte
@@ -177,6 +254,8 @@ export { RecON, RecSTOP };
             <option value={device.deviceId}> {device.label} | {device.deviceId.slice(0, 6)}...</option>
         {/each}
     </select>
+
+    <button onclick={selectSaveDirectory}>Select Save Directory {SaveDirectory.slice(6)}</button>
 
 </div>
 

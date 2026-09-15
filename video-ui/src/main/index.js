@@ -1,5 +1,13 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { join } from 'path'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+
+import { join } from 'node:path'
+import * as path from 'node:path'
+import * as fs from 'node:fs/promises';
+
+// Include fs and path module 
+// const fs = require('fs');
+// const path = require('path');
+
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
@@ -33,6 +41,15 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+
+    ipcMain.handle("choose-directory", async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ["openDirectory", "createDirectory"]
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+
 }
 
 // This method will be called when Electron has finished
@@ -52,6 +69,7 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
+
   createWindow()
 
   app.on('activate', function () {
@@ -60,6 +78,21 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+
+
+  ipcMain.handle("save-file", async (_event, { directory, filename, data }) => {
+    if (!directory || !filename || !data) throw new Error("Invalid save request");
+    
+    await fs.mkdir(directory, { recursive: true });
+
+    const safeName = path.basename(filename);
+    const target = path.join(directory, safeName);
+    
+    await fs.writeFile(target, Buffer.from(data));
+
+    return target;
+  });
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

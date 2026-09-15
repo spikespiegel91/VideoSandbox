@@ -8,7 +8,7 @@
   import Drag from './components/Drag-Container.svelte'
 
   const ipcHandle = () => window.electron.ipcRenderer.send('ping')
-
+  
 
  let rec = $state(null)
 
