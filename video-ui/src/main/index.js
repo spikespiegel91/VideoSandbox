@@ -3,6 +3,7 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'node:path'
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises';
+import { createWriteStream } from 'fs';
 
 // Include fs and path module 
 // const fs = require('fs');
@@ -80,20 +81,6 @@ app.whenReady().then(() => {
 })
 
 
-
-  ipcMain.handle("save-file", async (_event, { directory, filename, data }) => {
-    if (!directory || !filename || !data) throw new Error("Invalid save request");
-    
-    await fs.mkdir(directory, { recursive: true });
-
-    const safeName = path.basename(filename);
-    const target = path.join(directory, safeName);
-    
-    await fs.writeFile(target, Buffer.from(data));
-
-    return target;
-  });
-
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
@@ -105,3 +92,91 @@ app.on('window-all-closed', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
+
+ipcMain.handle("save-file", async (_event, { directory, filename, data }) => {
+  if (!directory || !filename || !data) throw new Error("Invalid save request");
+  
+  await fs.mkdir(directory, { recursive: true });
+
+  const safeName = path.basename(filename);
+  const target = path.join(directory, safeName);
+  
+  await fs.writeFile(target, Buffer.from(data));
+
+  return target;
+});
+
+
+// https://www.w3schools.com/nodejs/ref_writestream.asp
+
+//[ ] FIXME: This is a naive example for a single stream case
+// a second video start might overwrite the existing stream if not handled properly
+// example: use a jobID to track multiple concurrent recordings with a list (dict, or map) of streams
+// let stream;
+const streamJobs = new Map();
+
+function writeChunk(stream, buffer) {
+    return new Promise((resolve, reject) => {
+        stream.write(buffer, (err) => {
+            if (err) reject(err);
+            else resolve();
+        });
+    });
+}
+
+function finishStream(stream) {
+    return new Promise((resolve, reject) => {
+        stream.end((err) => {
+            if (err) reject(err);
+            else resolve();
+        });
+    });
+}
+
+ipcMain.handle("video:start", async (_event, {directory, filename}) => {
+    if (!directory || !filename) throw new Error("Invalid save request");
+    
+    await fs.mkdir(directory, { recursive: true });
+
+    const safeName = path.basename(filename);
+    const filepath = path.join(directory, safeName);
+    
+    // [ ] FIXME: create a new Job and add the stream to it, return the JobID
+    const stream = createWriteStream(filepath);
+    
+    
+    stream.on("error", (err) => {
+      console.error("Video stream error:", err);
+    });
+    
+
+    const jobID = crypto.randomUUID();
+
+    streamJobs.set(jobID, {
+        stream,
+        filePath: filepath
+    });
+
+    return { filepath, jobID };
+});
+
+ipcMain.handle("video:write", async (_event, { jobID, buffer }) => {
+  // if (!stream) return;
+  const job = streamJobs.get(jobID);
+    if (!job) {
+        throw new Error("No active recording for this JobID");
+    }
+    //stream.write(Buffer.from(buffer));
+    await writeChunk(job.stream, Buffer.from(buffer));
+});
+
+ipcMain.handle("video:stop", async ( _event, {jobID} ) => {
+   // if (!stream) return;
+    const job = streamJobs.get(jobID);
+    if (!job) {
+        throw new Error("No active recording for this JobID");
+    }
+
+    await finishStream(job.stream);
+    streamJobs.delete(jobID);
+});

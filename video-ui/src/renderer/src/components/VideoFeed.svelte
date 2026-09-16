@@ -152,7 +152,10 @@ onMount(async () => {
     await loadVideoDevices();
 });
 
-// [ ] add a select input for choosing the save directory
+
+
+///////////////////////////////////////
+let SaveDirectory = $state('');
 
 function selectSaveDirectory() {
     window.api.chooseDirectory().then((directory) => {
@@ -162,57 +165,116 @@ function selectSaveDirectory() {
     });
 }
 
+/**
+startRecording()
+      │
+      ├── window.video.start()
+      │       └── Electron opens file
+      │
+      └── mediaRecorder.start(2000)
+              │
+              ├── dataavailable → write()
+              ├── dataavailable → write()
+              ├── dataavailable → write()
+              │
+              │   ... 1–2 hours ...
+              │
+stopRecording()
+      │
+      └── mediaRecorder.stop()
+              │
+              ├── final dataavailable → write()
+              │
+              └── onstop → window.video.stop()
+                              │
+                              └── Electron closes file
+ * 
+ */
 
-let SaveDirectory = $state('');
+
 let recorder = $state(null);
-let chunks = $state([]);
-let mimeType = $state('video/webm');
+let mimeType = $state('video/webm'); //  "video/webm;codecs=vp8,opus"
+let writeQueue = Promise.resolve();
+// let chunks = $state([]);
 
-async function saveVideoStream( saveDirectory: string ) {
-    const blob = new Blob(chunks, { type: mimeType });
-    const buffer = new Uint8Array(await blob.arrayBuffer());
-    const filename = `recording-${timestamp()}.webm`;
+// async function saveVideoStream( saveDirectory: string ) {
+//     const blob = new Blob(chunks, { type: mimeType });
+//     const buffer = new Uint8Array(await blob.arrayBuffer());
+//     const filename = `recording-${timestamp()}.webm`;
 
-    try {
+//     try {
         
-        await window.api.saveFile({ 
-            directory: saveDirectory, 
-            filename, 
-            data: buffer 
-        })
+//         await window.api.saveFile({ 
+//             directory: saveDirectory, 
+//             filename, 
+//             data: buffer 
+//         })
 
-        console.log(`Video saved successfully to ${saveDirectory}/${filename}`);
+//         console.log(`Video saved successfully to ${saveDirectory}/${filename}`);
 
-    } catch (error) {
-        console.error(`Error saving video stream: ${error.name}`, error);
-    }
-}
+//     } catch (error) {
+//         console.error(`Error saving video stream: ${error.name}`, error);
+//     }
+// }
 
-function setNewRecorder() {
+// // naive implementation for single stream recording
+// function setNewRecorder() {
 
+//     if (!videoHTML?.srcObject) {
+//         throw new Error("No video stream available");
+//     }
+
+//     recorder = new MediaRecorder(videoHTML.srcObject , { mimeType });
+
+//     recorder.ondataavailable = e => {
+//         if (e.data.size) chunks.push(e.data);
+//     };
+
+//     recorder.onstop = async () => {
+//         await saveVideoStream(SaveDirectory);
+//         chunks = [];
+//         recorder = null;
+//     };
+
+//     return recorder;
+// }
+
+async function setNewMediaRecorder() { 
     if (!videoHTML?.srcObject) {
         throw new Error("No video stream available");
     }
 
-    recorder = new MediaRecorder(videoHTML.srcObject , { mimeType });
+    const filename = `recording-${timestamp()}.webm`;
+    
+    // Initializes the save directory and initializes the file for writing (WriteStream)
+    const { filepath, jobID } = await window.video.start({
+        directory: SaveDirectory, 
+        filename
+    })
 
-    recorder.ondataavailable = e => {
-        if (e.data.size) chunks.push(e.data);
-    };
+    recorder = new MediaRecorder(videoHTML.srcObject , { mimeType });
+    
+    recorder.ondataavailable = async (event) => {
+        if (event.data.size === 0) return;
+
+        // Keep writes in order so stop cannot close the stream too early.
+        writeQueue = writeQueue.then(async () => {
+            const buffer = await event.data.arrayBuffer();
+            await window.video.write({jobID, buffer});
+        });
+    }
 
     recorder.onstop = async () => {
-        await saveVideoStream(SaveDirectory);
-        chunks = [];
+        await writeQueue;
+
+        await window.video.stop(jobID);
+        // writeQueue = Promise.resolve();
         recorder = null;
     };
 
-    return recorder;
 }
 
-
-
-
-// [ ] TODO: add a reactive blinking icon to indicate recording status
+////////////////////////////////////
 let wink = $state(false)
 
 function RecON() {
@@ -220,19 +282,23 @@ function RecON() {
     wink = true;
 
     // we need ot record and save the video stream
-    chunks = [];
-    setNewRecorder();
-    recorder.start(1000);
+    //chunks = [];
+    //setNewRecorder();
+    // recorder.start(5000);
 
+    //
+    setNewMediaRecorder().then(() => {
+        recorder.start(3000);
+    });
 
 }
 
-function RecSTOP() {
+async function RecSTOP() {
     console.log("Stopping recording...");
     wink = false;
 
     if (recorder) {
-        recorder.stop();
+       await recorder.stop();
     }
 }
 
