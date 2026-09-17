@@ -4,7 +4,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
   chooseDirectory: () => ipcRenderer.invoke("choose-directory"),
-  saveFile: (payload) => ipcRenderer.invoke("save-file", payload)
+  saveFile: (payload) => ipcRenderer.invoke("save-file", payload),
+  openCSV: (delimeter) => ipcRenderer.invoke('open-csv', delimeter)
 }
 
 // dedicated video recording API for the renderer process

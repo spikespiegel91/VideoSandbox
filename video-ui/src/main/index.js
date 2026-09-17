@@ -106,6 +106,68 @@ ipcMain.handle("save-file", async (_event, { directory, filename, data }) => {
   return target;
 });
 
+function parseCSV(csv, delimiter = null) {
+  if (!csv || !csv.trim()) {
+    return [];
+  }
+
+  console.log("Parsing CSV with delimiter:", delimiter);
+
+  const lines = csv.trim().split(/\r?\n/);
+
+  // Automatically detect delimiter if not provided
+  if (!delimiter) {
+    const possibleDelimiters = [';', ',', '\t', '|'];
+
+    delimiter = possibleDelimiters.reduce((best, current) => {
+      const bestCount = lines[0].split(best).length;
+      const currentCount = lines[0].split(current).length;
+
+      return currentCount > bestCount ? current : best;
+    }, possibleDelimiters[0]);
+  }
+
+  const headers = lines[0]
+    .split(delimiter)
+    .map(header => header.trim());
+
+  return lines.slice(1).map(line => {
+    const values = line
+      .split(delimiter)
+      .map(value => value.trim());
+
+    return Object.fromEntries(
+      headers.map((header, index) => [
+        header,
+        values[index] ?? ''
+      ])
+    );
+  });
+}
+
+
+ipcMain.handle('open-csv', async (delimeter) => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [
+      { name: 'CSV Files', extensions: ['csv'] }
+    ]
+  });
+
+  if (result.canceled) {
+    return null;
+  }
+
+  const filePath = result.filePaths[0];
+  const content = await fs.readFile(filePath, 'utf8');
+  const data = parseCSV(content, delimeter);
+
+  return {
+    filePath,
+    data
+  };
+});
+
 
 // https://www.w3schools.com/nodejs/ref_writestream.asp
 
@@ -180,3 +242,6 @@ ipcMain.handle("video:stop", async ( _event, {jobID} ) => {
     await finishStream(job.stream);
     streamJobs.delete(jobID);
 });
+
+
+

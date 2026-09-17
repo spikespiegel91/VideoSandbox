@@ -1,6 +1,7 @@
 <script>
   import VideoPlayer from './components/VideoPlayer.svelte'
   import VideoFeed from './components/VideoFeed.svelte'
+  import DataFeed from  './components/DataFeed.svelte'
   import Versions from './components/Versions.svelte'
   import electronLogo from './assets/electron.svg'
 
@@ -53,6 +54,15 @@
   <Drag handle={true}> 
     <Resize >
       <VideoFeed bind:this={rec}/>
+      <div class= "tooltip footer">
+      </div>
+    </Resize>
+  </Drag>
+
+
+  <Drag handle={true}> 
+    <Resize >
+      <DataFeed />
       <div class= "tooltip footer">
       </div>
     </Resize>
